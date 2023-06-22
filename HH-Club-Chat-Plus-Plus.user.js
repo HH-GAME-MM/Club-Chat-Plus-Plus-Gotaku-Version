@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         HH Club Chat++ (Gotaku Version)
-// @version      0.61
+// @version      0.63
 // @description  Upgrade Club Chat with various features and bug fixes
 // @author       -MM-
 // @match        https://*.hentaiheroes.com/
@@ -25,7 +25,7 @@
 (function() {
     //definitions
     'use strict';
-    /*global ClubChat,club_tabs,$*/
+    /*global ClubChat,initTabSystem,$*/
 
     console.log('HH Club Chat++ Script v' + GM_info.script.version);
 
@@ -773,8 +773,19 @@
                 //resize custom tabs
                 resizeCustomTabs();
 
-                //bug fix for different browsers
-                fixTabs();
+                //important system message on start-up
+                /*
+                setTimeout(function() {
+                    //add a new node with the system message
+                    let div = document.createElement('div');
+                    div.setAttribute('class', 'chat-system-msg');
+                    div.setAttribute('style', 'font-size:16px');
+                    div.innerHTML = ' <b style="font-size:14px;font-weight:bold;color:red">-MM-:</b> <span style="font-size:14px;color:red">Kinkoid has changed the chat tabs system. The custom chat tabs have been temporarily disabled so that the chat can work again :)</span> ';
+                    let lastChatMsgNodes = document.querySelectorAll('div.club-chat-messages.dark_subpanel_box div.chat-msg');
+                    if(lastChatMsgNodes != null && lastChatMsgNodes.length != 0) lastChatMsgNodes[lastChatMsgNodes.length - 1].after(div);
+                    scrollDown();
+                }, 1000);
+                */
             }, 300);
         }
     }
@@ -838,9 +849,6 @@
 
                     //resize custom tabs
                     resizeCustomTabs();
-
-                    //bug fix for different browsers
-                    fixTabs();
 
                     //scroll down in the chat when chat turns visible
                     scrollDown();
@@ -1072,7 +1080,7 @@
                 if(e.target.tagName.toLowerCase() == 'p' && e.target.className == 'name-member')
                 {
                     //switch to chat and insert ping into input
-                    club_tabs.switchTab("chat_block", "chat-tabs", "chat-container");
+                    document.getElementById('club_members_tab').click();
                     ClubChat.insertPingIntoInput(e.target);
                 }
             }
@@ -1120,7 +1128,7 @@
                 let div = document.querySelector('#resize-chat-box div.chat-tabs');
                 let a = document.createElement('a');
                 a.setAttribute('id', 'HHClubChatPlusPlus_UpdateMessage');
-                a.setAttribute('style', 'color:red');
+                a.setAttribute('style', 'color:red;margin-left:.3rem');
                 a.setAttribute('href', HHCLUBCHATPLUSPLUS_URL_DOWNLOAD);
                 a.setAttribute('target', '_blank');
                 a.innerHTML = 'HH Club Chat++ is outdated. Update now!';
@@ -1199,71 +1207,108 @@
 
     function addCustomTabs()
     {
-        //create custom tabs
-        addNewTab('chat_hhclubchatplusplus_settings', 'chat-hhclubchatplusplus-settings', 'background-image:url(https://hh2.hh-content.com/design/menu/panel.svg);background-size:26px', getTagContentSettings('chat-hhclubchatplusplus-settings'));
-        addNewTab('chat_hhclubchatplusplus_help', 'chat-hhclubchatplusplus-help', 'background-image:url(' + HHCLUBCHATPLUSPLUS_URL_RES + 'tabs/help.png);background-size:24px', getTabContentHelp());
-        addNewTab('chat_hhclubchatplusplus_info', 'chat-hhclubchatplusplus-info', 'background-image:url(https://hh2.hh-content.com/design/ic_info.svg);background-size:contain', getTabContentInfo());
+        //replace the default buttons as they can move the window
+        if(document.getElementById('club_members_tab') !== null && document.getElementById('upgrades_tab') !== null)
+        {
+            //replace KK slideTab function
+            slideTab = function slideTab(tabs_id, tab) {
+                if(typeof tab === 'undefined') return; //MM: code line added
+                var $slider = $("#" + tabs_id + ">.slider");
+                if (!$slider.length) {
+                    return
+                }
+                var $tab = $("#" + tabs_id + '>button[data-tab="' + tab + '"]'); //MM: '>div[data-tab="' changed to '>button[data-tab="'
+                var tab_width = $tab.css("width");
+                var left = 0;
+                left = $tab[0].offsetLeft;
+                $slider.css({
+                    width: tab_width,
+                    left: left + "px"
+                })
+            }
+
+            //remove the buttons
+            document.getElementById('club_members_tab').remove();
+            document.getElementById('upgrades_tab').remove();
+
+            //create new buttons
+            css.sheet.insertRule('.chat-tabs button#club_members_tab {margin-left:0}');
+            addNewTabButton('club_members_tab', 'chat_messages_list', 'background-image:url(https://hh2.hh-content.com/clubs-chat/ic_ChatBTN.png);background-size:23px;width:25px;height:25px');
+            addNewTabButton('upgrades_tab', 'chat_members_list', '');
+        }
+
+        //css
+        css.sheet.insertRule('.chat-tabs button.switch-tab.tab-switcher-fade-in {-webkit-box-shadow:none;-moz-box-shadow:none;box-shadow:none;}'); //active button
+
+        //KK callback for all tab buttons
+        let chatCb = function() {
+            ClubChat.switchClubChatTab.bind(ClubChat)
+        }
+
+        //default chat tabs
+        let tabs = {
+            chat_messages_list: {
+                callback: chatCb
+            },
+            chat_members_list: {
+                callback: chatCb
+            }
+        };
+        tabs.length = 2;
+
+        //custom chat tabs
+        addNewTab(tabs, chatCb, 'chat_hhclubchatplusplus_settings', 'chat-hhclubchatplusplus-settings', 'background-image:url(https://hh2.hh-content.com/design/menu/panel.svg);background-size:26px', getTagContentSettings('chat-hhclubchatplusplus-settings'));
+        addNewTab(tabs, chatCb, 'chat_hhclubchatplusplus_help', 'chat-hhclubchatplusplus-help', 'background-image:url(' + HHCLUBCHATPLUSPLUS_URL_RES + 'tabs/help.png);background-size:24px', getTabContentHelp());
+        addNewTab(tabs, chatCb, 'chat_hhclubchatplusplus_info', 'chat-hhclubchatplusplus-info', 'background-image:url(https://hh2.hh-content.com/design/ic_info.svg);background-size:contain', getTabContentInfo());
+
+        //init tab system
+        initTabSystem("club-chat", tabs);
 
         //resize custom tabs
         resizeCustomTabs();
 
-        //bug fix for different browsers
-        fixTabs();
+        //activate chat tab
+        document.getElementById('club_members_tab').click();
 
-        function addNewTab(name, bodyName, iconStyle, content)
+        function addNewTabButton(id, name, iconStyle)
         {
-            //add length to club_tabs.tabs
-            if(typeof club_tabs.tabs.length == 'undefined') club_tabs.tabs.length = 2;
+            //add the button of a new tab
+            let btnTab = document.createElement('button');
+            btnTab.setAttribute('class', 'square_blue_btn switch-tab tab-switcher-fade-out');
+            btnTab.setAttribute('id', id);
+            btnTab.setAttribute('data-tab', name);
+            btnTab.innerHTML = '<span class="clubMember_flat_icn" style="'+iconStyle+'"></span>';
+            document.querySelector('div#club-chat-tabs').appendChild(btnTab);
+        }
 
+        function addNewTab(tabs, callback, name, bodyName, iconStyle, content)
+        {
             //add the css of a new tab
-            css.sheet.insertRule('.chat-tabs button#' + name + '[active_btn] {-webkit-box-shadow:none;-moz-box-shadow:none;box-shadow:none;}');
-            css.sheet.insertRule('.chat-tabs button#' + name + ' {-webkit-flex:0 0 36px;-ms-flex:0 0 36px;flex:0 0 36px;margin-right:5px;}');
             css.sheet.insertRule('div.chat-active-wrapper div.' + bodyName + ' a {color:white;}');
             css.sheet.insertRule('div.chat-active-wrapper div.' + bodyName + ' li {margin-left:15px;}');
             css.sheet.insertRule('div.chat-active-wrapper div.' + bodyName + ' span.title {font-weight:bold;color:rgb(255, 184, 39);display:inline-block;padding-bottom:4px;}');
             css.sheet.insertRule('div.chat-active-wrapper div.' + bodyName + ' .nicescroll-rails div {background:linear-gradient(to top,#ffa23e 0,#ff545c 100%);webkit-box-shadow:0 2px 0 1px rgba(0,0,0,.35),inset 0 3px 0 rgba(255,232,192,.75);-moz-box-shadow:0 2px 0 1px rgba(0,0,0,.35),inset 0 3px 0 rgba(255,232,192,.75);box-shadow:0 2px 0 1px rgba(0,0,0,.35),inset 0 3px 0 rgba(255,232,192,.75);}');
 
             //add the data of a new tab
-            club_tabs.tabs[name] = {
-                view_version: 'default',
-                body_class: bodyName,
-                animate: false
+            tabs[name] = {
+                callback: callback
             }
-            club_tabs.tabs.length++;
+            tabs.length++;
 
             //add the button of a new tab
-            let btnTab = document.createElement('button');
-            btnTab.setAttribute('class', 'square_blue_btn');
-            btnTab.setAttribute('id', name);
-            btnTab.innerHTML = '<span class="clubMember_flat_icn" style="'+iconStyle+'"></span>';
-            btnTab.addEventListener('click', (evt) => {
-                var $clickedButton = $(evt.target).is("button") ? $(evt.target) : $(evt.target).parent();
-                var tabName = $clickedButton.attr("id");
-                club_tabs.switchTab(tabName, "chat-tabs", "chat-container");
-                ClubChat.$msgHolder.getNiceScroll().resize();
-                ClubChat.$membersListContainer.getNiceScroll().resize();
-                $("div.chat-active-wrapper div." + bodyName).getNiceScroll().resize();
-                ClubChat.updateScrollPosition()
-            });
-
-            //insert the button before the update message (if there is one)
-            let chatTabsNode = document.querySelector('div.chat-tabs');
-            let HHClubChatPlusPlus_UpdateMessage = document.getElementById('HHClubChatPlusPlus_UpdateMessage');
-            if(HHClubChatPlusPlus_UpdateMessage != null) chatTabsNode.insertBefore(btnTab, HHClubChatPlusPlus_UpdateMessage);
-            else chatTabsNode.appendChild(btnTab);
+            addNewTabButton(name + '_btn', name, iconStyle)
 
             //add the node of a new tab
             let tabNode = document.createElement('div');
-            tabNode.setAttribute('class', bodyName + ' dark_subpanel_box');
+            tabNode.setAttribute('id', name);
+            tabNode.setAttribute('class', bodyName + ' dark_subpanel_box switch-tab-content');
             tabNode.setAttribute('style', 'padding:10px;font-family:Tahoma,Helvetica,Arial,sans-serif;line-height:1.4;');
-            tabNode.setAttribute('tabindex', club_tabs.tabs.length);
+            tabNode.setAttribute('tabindex', tabs.length);
             tabNode.innerHTML = content;
             document.querySelector('div.chat-active-wrapper').appendChild(tabNode);
 
             //create nice scrollbar
             $("div.chat-active-wrapper div." + bodyName).niceScroll();
-
-            return tabNode;
         }
 
         function getTagContentSettings(bodyName)
@@ -1553,34 +1598,6 @@
                 $tab.getNiceScroll().resize();
             }
         });
-    }
-
-    function fixTabs()
-    {
-        //bug fix for different browsers: The members list is outside the window at the first visit + the same behavior with the custom tabs
-        let visibleTabName = null;
-        let tabs = [
-            { name: 'chat_hhclubchatplusplus_settings', body: 'chat-hhclubchatplusplus-settings'},
-            { name: 'chat_hhclubchatplusplus_help', body: 'chat-hhclubchatplusplus-help'},
-            { name: 'chat_hhclubchatplusplus_info', body: 'chat-hhclubchatplusplus-info'},
-            { name: 'chat_members_list', body: 'chat-members-list'},
-            { name: 'chat_block', body: 'club-chat'}
-        ];
-
-        tabs.forEach(function(e) {
-            let $tab = $('div.chat-active-wrapper div.' + e.body);
-            if($tab.length == 1)
-            {
-                let isVisible = $tab[0].classList.contains("visible-tab");
-                $tab.show();
-                if(isVisible) visibleTabName = e.name;
-                else $tab.hide();
-            }
-        });
-
-        if(visibleTabName == null) visibleTabName = 'chat_block';
-        club_tabs.switchTab(visibleTabName == 'chat_members_list' ? 'chat_block' : 'chat_members_list', 'chat-tabs', 'chat-container');
-        club_tabs.switchTab(visibleTabName, 'chat-tabs', 'chat-container');
     }
 
     function fixScrolling()
